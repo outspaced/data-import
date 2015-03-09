@@ -48,7 +48,7 @@ class OneToManyReader implements CountableReaderInterface
         ReaderInterface $leftReader,
         ReaderInterface $rightReader,
         $nestKey,
-        $leftJoinField,
+        $leftJoinField = null,
         $rightJoinField = null
     ) {
         $this->leftJoinField = $leftJoinField;
@@ -85,33 +85,35 @@ class OneToManyReader implements CountableReaderInterface
                 )
             );
         }
-        $leftRow[$this->nestKey] = array();
 
-        $leftId     = $this->getRowId($leftRow, $this->leftJoinField);
-        $rightRow   = $this->rightReader->current();
-        $rightId    = $this->getRowId($rightRow, $this->rightJoinField);
-
-        while ($leftId == $rightId && $this->rightReader->valid()) {
-
-            $leftRow[$this->nestKey][] = $rightRow;
-            $this->rightReader->next();
-
-            $rightRow = $this->rightReader->current();
-
-            if($this->rightReader->valid()) {
-                $rightId = $this->getRowId($rightRow, $this->rightJoinField);
-            }
+        if ( ! $this->leftJoinField)
+        {
+        	$leftRow[$this->nestKey] = $this->rightReader->current();
         }
-
+        else 
+        {
+        	$leftRow[$this->nestKey] = array();
+        
+	        $leftId     = $this->getRowId($leftRow, $this->leftJoinField);
+	        $rightRow   = $this->rightReader->current();
+	        $rightId    = $this->getRowId($rightRow, $this->rightJoinField);
+	
+	        while ($leftId == $rightId && $this->rightReader->valid()) {
+	
+	            $leftRow[$this->nestKey][] = $rightRow;
+	            $this->rightReader->next();
+	
+	            $rightRow = $this->rightReader->current();
+	
+	            if($this->rightReader->valid()) {
+	                $rightId = $this->getRowId($rightRow, $this->rightJoinField);
+	            }
+	        }
+        }
+        
         return $leftRow;
     }
 
-    /**
-     * @param array $row
-     * @param string $idField
-     * @return mixed
-     * @throws ReaderException
-     */
     protected function getRowId(array $row, $idField)
     {
         if (!array_key_exists($idField, $row)) {
