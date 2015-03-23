@@ -38,6 +38,11 @@ class OneToManyReader implements CountableReaderInterface
     protected $nestKey;
 
     /**
+     * @var array Indexes for rightReader to allow for joins
+     */
+    protected $rightIndexes = [];
+
+    /**
      * @param ReaderInterface $leftReader
      * @param ReaderInterface $rightReader
      * @param string $nestKey
@@ -90,22 +95,52 @@ class OneToManyReader implements CountableReaderInterface
         $leftId     = $this->getRowId($leftRow, $this->leftJoinField);
         $rightRow   = $this->rightReader->current();
         $rightId    = $this->getRowId($rightRow, $this->rightJoinField);
-
-        while ($leftId == $rightId && $this->rightReader->valid()) {
-
-            $leftRow[$this->nestKey][] = $rightRow;
-            $this->rightReader->next();
-
-            $rightRow = $this->rightReader->current();
-
-            if($this->rightReader->valid()) {
-                $rightId = $this->getRowId($rightRow, $this->rightJoinField);
-            }
+        
+        if ($this->rightReader instanceof \SeekableIterator)
+        {
+        	if ( ! $this->rightIndexes)
+        	{
+	        	foreach ($this->rightReader as $k => $v)
+	        	{
+	        		if (isset($v[$this->rightJoinField]))
+	        		{
+	        			$this->rightIndexes[$v[$this->rightJoinField]] = $k;
+	        		}
+	        	}
+        	}
+        	        	
+        	// First extract the keys 
+        	print '<br/>left:'.$this->leftJoinField;
+        	print '<br/>right:'.$this->rightJoinField;
+        	
+        	echo "<pre>";
+        	print_r($this->rightIndexes);
+        	echo "</pre>";
+        	
         }
-
+        else
+        {
+	        while ($leftId == $rightId && $this->rightReader->valid()) {
+	
+	            $leftRow[$this->nestKey][] = $rightRow;
+	            $this->rightReader->next();
+	
+	            $rightRow = $this->rightReader->current();
+	
+	            if($this->rightReader->valid()) {
+	                $rightId = $this->getRowId($rightRow, $this->rightJoinField);
+	            }
+	        }
+        }
+        
         return $leftRow;
     }
-
+    
+    protected function matchRows()
+    {
+    	
+    }
+    
     /**
      * @param array $row
      * @param string $idField
