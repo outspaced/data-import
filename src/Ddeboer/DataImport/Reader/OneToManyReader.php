@@ -92,56 +92,53 @@ class OneToManyReader implements CountableReaderInterface
         }
         $leftRow[$this->nestKey] = array();
 
-        $leftId     = $this->getRowId($leftRow, $this->leftJoinField);
-        $rightRow   = $this->rightReader->current();
-        $rightId    = $this->getRowId($rightRow, $this->rightJoinField);
-        
-        // @todo make a logical split here
-        if ($this->rightReader instanceof \SeekableIterator)
-        {
-            // EXTRACT KEYS 
-            // @todo move this to own method
-        	if ( ! $this->rightIndexes)
-        	{
-	        	foreach ($this->rightReader as $k => $v)
-	        	{
-	        		if (isset($v[$this->rightJoinField]))
-	        		{
-	        			$this->rightIndexes[$v[$this->rightJoinField]][] = $k;
-	        		}
-	        	}
-        	}
-        	        	
-        	// @todo explain
-        	if (isset($this->rightIndexes[$leftId])) {
-        	    foreach($this->rightIndexes[$leftId] as $index) {
-            	    $this->rightReader->seek($index);
-    	            $rightRow = $this->rightReader->current();
-    	            $leftRow[$this->nestKey][] = $rightRow;
-        	    }
-        	}
-        }
-        else
-        {
-	        while ($leftId == $rightId && $this->rightReader->valid()) {
-	
-	            $leftRow[$this->nestKey][] = $rightRow;
-	            $this->rightReader->next();
-	
-	            $rightRow = $this->rightReader->current();
-	
-	            if($this->rightReader->valid()) {
-	                $rightId = $this->getRowId($rightRow, $this->rightJoinField);
-	            }
-	        }
+        $leftId = $this->getRowId($leftRow, $this->leftJoinField);
+
+        // Warning: if the rightReader is not a SeekableIterator then the leftReader and
+        // rightReader must both have their rows ordered by the join field
+        if ($this->rightReader instanceof \SeekableIterator) {
+            if (!$this->rightIndexes) {
+                $this->prepareRightIndexes();
+            }
+                    
+            // Check the prepared indexes for a reference to $leftId
+            if (isset($this->rightIndexes[$leftId])) {
+                foreach($this->rightIndexes[$leftId] as $index) {
+                    $this->rightReader->seek($index);
+                    $leftRow[$this->nestKey][] = $this->rightReader->current();
+                }
+            }
+        } else {
+            $rightRow = $this->rightReader->current();
+            $rightId  = $this->getRowId($rightRow, $this->rightJoinField);
+            
+            while ($leftId == $rightId && $this->rightReader->valid()) {
+    
+                $leftRow[$this->nestKey][] = $rightRow;
+                $this->rightReader->next();
+    
+                $rightRow = $this->rightReader->current();
+    
+                if($this->rightReader->valid()) {
+                    $rightId = $this->getRowId($rightRow, $this->rightJoinField);
+                }
+            }
         }
         
         return $leftRow;
     }
-    
-    protected function matchRows()
+
+    /**
+     * Reads through the rightReader iterator and indexes the keys
+     * @return void
+     */
+    protected function prepareRightIndexes()
     {
-    	
+        foreach ($this->rightReader as $key => $value) {
+            if (isset($value[$this->rightJoinField])) {
+                $this->rightIndexes[$value[$this->rightJoinField]][] = $key;
+            }
+        }
     }
     
     /**
