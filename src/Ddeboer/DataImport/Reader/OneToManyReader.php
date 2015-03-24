@@ -96,27 +96,30 @@ class OneToManyReader implements CountableReaderInterface
         $rightRow   = $this->rightReader->current();
         $rightId    = $this->getRowId($rightRow, $this->rightJoinField);
         
+        // @todo make a logical split here
         if ($this->rightReader instanceof \SeekableIterator)
         {
+            // EXTRACT KEYS 
+            // @todo move this to own method
         	if ( ! $this->rightIndexes)
         	{
 	        	foreach ($this->rightReader as $k => $v)
 	        	{
 	        		if (isset($v[$this->rightJoinField]))
 	        		{
-	        			$this->rightIndexes[$v[$this->rightJoinField]] = $k;
+	        			$this->rightIndexes[$v[$this->rightJoinField]][] = $k;
 	        		}
 	        	}
         	}
         	        	
-        	// First extract the keys 
-        	print '<br/>left:'.$this->leftJoinField;
-        	print '<br/>right:'.$this->rightJoinField;
-        	
-        	echo "<pre>";
-        	print_r($this->rightIndexes);
-        	echo "</pre>";
-        	
+        	// @todo explain
+        	if (isset($this->rightIndexes[$leftId])) {
+        	    foreach($this->rightIndexes[$leftId] as $index) {
+            	    $this->rightReader->seek($index);
+    	            $rightRow = $this->rightReader->current();
+    	            $leftRow[$this->nestKey][] = $rightRow;
+        	    }
+        	}
         }
         else
         {

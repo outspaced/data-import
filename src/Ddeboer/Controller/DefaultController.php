@@ -35,7 +35,11 @@ class DefaultController extends Controller
 			],
     		[ 
     			'label' => 'a',
-    			'thing' => 'cloud',
+    			'thing' => 'clouds',
+			],
+    		[ 
+    			'label' => 'b',
+    			'thing' => 'caravan',
 			],
     	];
     	    	
