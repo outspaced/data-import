@@ -76,6 +76,8 @@ class OneToManyReader implements CountableReaderInterface
      *
      * @return array
      * @throws ReaderException
+     * 
+     * @TODO - my changes break the tests.
      */
     public function current()
     {
