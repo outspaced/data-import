@@ -241,13 +241,10 @@ class OneToManyReaderTest extends \PHPUnit_Framework_TestCase
     }
 
     /**
-     * This is probably a limitation - but it's not need for current implementation
      * @dataProvider outOfOrderRowProvider
      */
-    public function testOutOfOrderRowsInRightReaderAreNotNested($leftData, $rightData, $expected)
+    public function testOutOfOrderRowsInRightReaderAreNested($leftData, $rightData, $expected)
     {
-        //var_dump($leftData);
-        //var_dump($rightData);
         $leftReader = new ArrayReader($leftData);
         $rightReader = new ArrayReader($rightData);
         $oneToManyReader = new OneToManyReader($leftReader, $rightReader, 'items', 'OrderId');
@@ -304,7 +301,7 @@ class OneToManyReaderTest extends \PHPUnit_Framework_TestCase
                     ),
                 ),
             ),
-            'skip-out-of-order' => array(
+            'do-not-skip-out-of-order' => array(
                 'left' => array(
                     array(
                         'OrderId'   => 1,
@@ -333,12 +330,22 @@ class OneToManyReaderTest extends \PHPUnit_Framework_TestCase
                     array(
                         'OrderId'   => 1,
                         'Price'     => 30,
-                        'items'     => array()
+                        'items'     => array(
+                            array(
+                                'OrderId'   => 1,
+                                'Name'      => 'Super Cool Item 3',
+                            ),
+		                )
                     ),
                     array(
                         'OrderId'   => 2,
                         'Price'     => 15,
-                        'items'     => array(),
+                        'items'     => array(
+                            array(
+                                'OrderId'   => 2,
+                                'Name'      => 'Super Cool Item 2',
+                            ),
+                        ),
                     ),
                 ),
             ),
