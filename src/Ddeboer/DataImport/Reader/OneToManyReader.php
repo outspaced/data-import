@@ -82,16 +82,8 @@ class OneToManyReader implements CountableReaderInterface
     public function current()
     {
         $leftRow = $this->leftReader->current();
-
-        if (array_key_exists($this->nestKey, $leftRow)) {
-            throw new ReaderException(
-                sprintf(
-                    'Left Row: "%s" Reader already contains a field named "%s". Please choose a different nest key field',
-                    $this->key(),
-                    $this->nestKey
-                )
-            );
-        }
+        
+        $this->throwReaderExceptionIfNestKeyExists($leftRow);
         $leftRow[$this->nestKey] = array();
 
         $leftId = $this->getRowId($leftRow, $this->leftJoinField);
@@ -140,6 +132,19 @@ class OneToManyReader implements CountableReaderInterface
             if (isset($value[$this->rightJoinField])) {
                 $this->rightIndexes[$value[$this->rightJoinField]][] = $key;
             }
+        }
+    }
+    
+    protected function throwReaderExceptionIfNestKeyExists($leftRow)
+    {
+        if (array_key_exists($this->nestKey, $leftRow)) {
+            throw new ReaderException(
+                sprintf(
+                    'Left Row: "%s" Reader already contains a field named "%s". Please choose a different nest key field',
+                    $this->key(),
+                    $this->nestKey
+                )
+            );
         }
     }
     
