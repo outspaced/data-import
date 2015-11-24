@@ -40,6 +40,7 @@ Documentation
     - [DoctrineWriter](#doctrinewriter)
     - [PdoWriter](#pdowriter)
     - [ExcelWriter](#excelwriter)
+    - [ConsoleTableWriter](#consoletablewriter)
     - [ConsoleProgressWriter](#consoleprogresswriter)
     - [CallbackWriter](#callbackwriter)
     - [AbstractStreamWriter](#abstractstreamwriter)
@@ -48,6 +49,7 @@ Documentation
   * [Filters](#filters)
     - [CallbackFilter](#callbackfilter)
     - [OffsetFilter](#offsetfilter)
+    - [DateTimeThresholdFilter](#datetimethresholdfilter)
     - [ValidatorFilter](#offsetfilter)
   * [Converters](#converters)
     - [Item converters](#item-converters)
@@ -486,6 +488,12 @@ or
 $writer = new DoctrineWriter($entityManager, 'YourNamespace:Employee', array('column1', 'column2', 'column3'));
 ```
 
+The DoctrineWriter will also search out associations automatically and link them by an entity reference. For example
+suppose you have a Product entity that you are importing and must be associated to a Category. If there is a field in 
+the import file named 'Category' with an id, the writer will use metadata to get the association class and create a
+reference so that it can be associated properly. The DoctrineWriter will skip any association fields that are already
+objects in cases where a converter was used to retrieve the association.
+
 #### PdoWriter
 
 Use the PDO writer for importing data into a relational database (such as
@@ -539,6 +547,34 @@ existing sheet:
 
 ```php
 $writer = new ExcelWriter($file, 'Old sheet');
+```
+#### ConsoleTableWriter
+
+This writer displays items as table on console output for debug purposes
+when you start the workflow from the command-line. 
+It requires Symfony’s Console component 2.5 or higher:
+
+```bash
+$ composer require symfony/console ~2.5
+```
+
+```php
+use Ddeboer\DataImport\Reader;
+use Ddeboer\DataImport\Writer\ConsoleTableWriter;
+use Symfony\Component\Console\Output\ConsoleOutput;
+use Symfony\Component\Console\Helper\Table;
+
+$reader = new Reader\...;
+$output = new ConsoleOutput(...);
+
+$table = new Table($output);
+
+// Make some manipulations, e.g. set table style
+$table->setStyle('compact');
+
+$workflow = new Workflow($reader);
+$workflow->addWriter(new ConsoleTableWriter($output, $table));
+
 ```
 
 #### ConsoleProgressWriter
@@ -696,6 +732,23 @@ $filter = new OffsetFilter(0, 3);
 
 // Start from the third item, process max five items (items 3 - 7)
 $filter = new OffsetFilter(2, 5);
+```
+
+#### DateTimeThresholdFilter
+
+This filter is useful if you want to do incremental imports. Specify a threshold
+`DateTime` instance, a column name (defaults to `updated_at`), and a
+`DateTimeValueConverter` that will be used to convert values read from the
+filtered items. The item strictly older than the threshold will be discarded.
+
+```php
+use Ddeboer\DataImport\Filter\DateTimeThresholdFilter;
+use Ddeboer\DataImport\ValueConverter\DateTimeValueConverter;
+
+new DateTimeThresholdFilter(
+    new DateTimeValueConverter(),
+    new \DateTime('yesterday')
+);
 ```
 
 #### ValidatorFilter
@@ -1126,7 +1179,7 @@ $workflow = new Workflow($reader);
 
 // Add the writer to the workflow
 $file = new \SplFileObject('output.csv', 'w');
-$writer = new Writer($file);
+$writer = new CsvWriter($file);
 $workflow->addWriter($writer);
 
 // As you can see, the first names are not capitalized correctly. Let's fix
