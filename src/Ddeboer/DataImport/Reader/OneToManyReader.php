@@ -38,6 +38,11 @@ class OneToManyReader implements CountableReaderInterface
     protected $nestKey;
 
     /**
+     * @var array Indexes for rightReader to allow for joins
+     */
+    protected $rightIndexes = [];
+
+    /**
      * @param ReaderInterface $leftReader
      * @param ReaderInterface $rightReader
      * @param string $nestKey
@@ -62,6 +67,9 @@ class OneToManyReader implements CountableReaderInterface
         $this->leftReader   = $leftReader;
         $this->rightReader  = $rightReader;
         $this->nestKey      = $nestKey;
+        
+        
+//         dump($nestKey);
     }
 
     /**
@@ -75,7 +83,111 @@ class OneToManyReader implements CountableReaderInterface
     public function current()
     {
         $leftRow = $this->leftReader->current();
+        
+        $this->throwReaderExceptionIfNestKeyExists($leftRow);
+        
+        if ( ! $this->leftJoinField)
+        {
+        	$leftRow[$this->nestKey] = $this->rightReader->current();
+        	return $leftRow;
+        }
+        
+        $leftRow[$this->nestKey] = array();
+        
+        $leftId = $this->getRowId($leftRow, $this->leftJoinField);
 
+        // Warning: if the rightReader is not a SeekableIterator then the leftReader and
+        // rightReader must both have their rows ordered by the join field
+        if ($this->rightReader instanceof \SeekableIterator) {
+            
+//             dump($this->nestKey, 'seekability');
+            
+            if (!$this->rightIndexes) {
+                $this->prepareRightIndexes();
+//                 dump($this->rightIndexes);
+            }
+            
+            // Check the prepared indexes for a reference to $leftId
+            if (isset($this->rightIndexes[$leftId])) {
+                foreach($this->rightIndexes[$leftId] as $index) {
+                    $this->rightReader->seek($index);
+                    $leftRow[$this->nestKey][] = $this->rightReader->current();
+                    
+                }
+            } else {
+                
+                $leftRow[$this->nestKey][] = ['sku' => $leftId, 'created_at' => 0, 'value' => 1];
+//                 dump('I cant find '.$leftId);
+            }
+        } else {
+
+//             dump('oh I wish I had seekability');
+            
+            
+            $rightRow = $this->rightReader->current();
+            $rightId  = $this->getRowId($rightRow, $this->rightJoinField);
+            
+            // Egads this really is a disaster
+            while ($leftId == $rightId && $this->rightReader->valid()) {
+    
+                $leftRow[$this->nestKey][] = $rightRow;
+                $this->rightReader->next();
+    
+                $rightRow = $this->rightReader->current();
+                
+                if($this->rightReader->valid()) {
+                    $rightId = $this->getRowId($rightRow, $this->rightJoinField);
+                }
+            }
+        }
+        
+        return $leftRow;
+    }
+
+    /**
+     * Reads through the rightReader iterator and indexes the keys
+     * @return void
+     */
+    protected function prepareRightIndexes()
+    {
+        foreach ($this->rightReader as $key => $value) {
+            
+//             dump($key, $value);
+            
+            if (isset($value[$this->rightJoinField])) {
+                $this->rightIndexes[$value[$this->rightJoinField]][] = $key;
+            } else {
+                $this->throwReaderExceptionForMissingKey($this->key(), $this->rightJoinField);
+            }
+        }
+    }
+
+    /**
+     * Throws the appropriate exception for a missing key
+     * 
+     * @param string $key
+     * @param string $fieldName
+     * @throws ReaderException
+     */
+    protected function throwReaderExceptionForMissingKey($key, $fieldName)
+    {
+        throw new ReaderException(
+            sprintf(
+                'Row: "%s" has no field named "%s"',
+                $key,
+                $fieldName
+            )
+        );
+    }
+    
+    /**
+     * Checks $leftRow for the presence of $this->nestKey and throws exception if it already exists
+     * 
+     * @param  array $leftReader
+     * @throws ReaderException
+     */
+    protected function throwReaderExceptionIfNestKeyExists(array $leftRow)
+    {
         if (array_key_exists($this->nestKey, $leftRow)) {
             throw new ReaderException(
                 sprintf(
@@ -85,47 +197,20 @@ class OneToManyReader implements CountableReaderInterface
                 )
             );
         }
-
-        if ( ! $this->leftJoinField)
-        {
-        	$leftRow[$this->nestKey] = $this->rightReader->current();
-        }
-        else 
-        {
-        	$leftRow[$this->nestKey] = array();
-        
-	        $leftId     = $this->getRowId($leftRow, $this->leftJoinField);
-	        $rightRow   = $this->rightReader->current();
-	        $rightId    = $this->getRowId($rightRow, $this->rightJoinField);
-	
-	        while ($leftId == $rightId && $this->rightReader->valid()) {
-	
-	            $leftRow[$this->nestKey][] = $rightRow;
-	            $this->rightReader->next();
-	
-	            $rightRow = $this->rightReader->current();
-	
-	            if($this->rightReader->valid()) {
-	                $rightId = $this->getRowId($rightRow, $this->rightJoinField);
-	            }
-	        }
-        }
-        
-        return $leftRow;
     }
-
+    
+    /**
+     * @param array $row
+     * @param string $idField
+     * @return mixed
+     * @throws ReaderException
+     */
     protected function getRowId(array $row, $idField)
     {
         if (!array_key_exists($idField, $row)) {
-            throw new ReaderException(
-                sprintf(
-                    'Row: "%s" has no field named "%s"',
-                    $this->key(),
-                    $idField
-                )
-            );
+            $this->throwReaderExceptionForMissingKey($this->key(), $this->rightJoinField);
         }
-
+        
         return $row[$idField];
     }
 
